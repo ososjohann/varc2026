@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Live Responses</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #0a0a0a;
+      --surface: #111111;
+      --accent: #e8ff47;
+      --accent2: #47ffcc;
+      --text: #f0f0f0;
+      --muted: #444;
+      --border: #222;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      position: relative;
+    }
+
+    /* Subtle grid background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(var(--border) 1px, transparent 1px),
+        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 40px 40px;
+      opacity: 0.4;
+      pointer-events: none;
+    }
+
+    /* Top accent bar */
+    .top-bar {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+    }
+
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      text-align: center;
+      padding: 2rem;
+    }
+
+    .label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .label::before, .label::after {
+      content: '';
+      display: inline-block;
+      width: 24px;
+      height: 1px;
+      background: var(--accent);
+      opacity: 0.5;
+    }
+
+    .counter-box {
+      position: relative;
+      display: inline-block;
+    }
+
+    .counter {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: clamp(9rem, 22vw, 16rem);
+      line-height: 0.9;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+      display: block;
+      position: relative;
+    }
+
+    .counter.bump {
+      transform: scale(1.06);
+    }
+
+    /* Glitch effect on the number */
+    .counter::after {
+      content: attr(data-val);
+      position: absolute;
+      inset: 0;
+      color: var(--accent2);
+      clip-path: polygon(0 30%, 100% 30%, 100% 50%, 0 50%);
+      opacity: 0;
+      transform: translateX(-3px);
+      animation: glitch 6s infinite;
+    }
+
+    @keyframes glitch {
+      0%, 94%, 100% { opacity: 0; }
+      95% { opacity: 0.15; transform: translateX(-3px); }
+      96% { opacity: 0.15; transform: translateX(3px); }
+      97% { opacity: 0; }
+    }
+
+    .sublabel {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-top: 1.2rem;
+    }
+
+    /* Status bar */
+    .status-bar {
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      padding: 0.75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-top: 1px solid var(--border);
+      background: rgba(10,10,10,0.85);
+      backdrop-filter: blur(8px);
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--muted);
+      margin-right: 0.4rem;
+      vertical-align: middle;
+      transition: background 0.3s;
+    }
+
+    .dot.live { background: var(--accent); box-shadow: 0 0 6px var(--accent); animation: pulse 2s infinite; }
+    .dot.error { background: #ff4747; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Progress bar for next refresh */
+    .progress-wrap {
+      position: fixed;
+      bottom: 34px; left: 0; right: 0;
+      height: 2px;
+      background: transparent;
+    }
+
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent2));
+      width: 0%;
+      transition: width linear;
+    }
+
+    /* Config panel */
+    .config {
+      position: fixed;
+      top: 1.5rem; right: 1.5rem;
+      z-index: 10;
+    }
+
+    .config-btn {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      padding: 0.4rem 0.8rem;
+      cursor: pointer;
+      text-transform: uppercase;
+      transition: all 0.2s;
+    }
+    .config-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .config-panel {
+      display: none;
+      position: absolute;
+      top: 2.2rem; right: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 1.2rem;
+      width: 280px;
+      gap: 0.8rem;
+      flex-direction: column;
+    }
+    .config-panel.open { display: flex; }
+
+    .config-panel label {
+      font-size: 0.6rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+
+    .config-panel input {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.7rem;
+      padding: 0.4rem 0.6rem;
+      outline: none;
+    }
+    .config-panel input:focus { border-color: var(--accent); }
+
+    .config-panel button {
+      background: var(--accent);
+      border: none;
+      color: #000;
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.5rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    .config-panel button:hover { opacity: 0.8; }
+
+    .error-msg {
+      color: #ff4747;
+      font-size: 0.6rem;
+      letter-spacing: 0.1em;
+      margin-top: 0.5rem;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<div class="top-bar"></div>
+
+<!-- Config button -->
+<div class="config">
+  <button class="config-btn" onclick="toggleConfig()">⚙ Setup</button>
+  <div class="config-panel" id="configPanel">
+    <div>
+      <label>API Token</label>
+      <input type="password" id="apiToken" placeholder="tfp_XXXXXXXXXXXX" />
+    </div>
+    <div>
+      <label>Form ID</label>
+      <input type="text" id="formId" value="fkp1R74n" />
+    </div>
+    <div>
+      <label>Refresh every (seconds)</label>
+      <input type="number" id="interval" value="20" min="10" max="300" />
+    </div>
+    <button onclick="saveAndStart()">Save & Start</button>
+    <div class="error-msg" id="errorMsg"></div>
+  </div>
+</div>
+
+<!-- Main counter -->
+<div class="wrapper">
+  <div class="label">Completed responses</div>
+  <div class="counter-box">
+    <span class="counter" id="counter" data-val="—">—</span>
+  </div>
+  <div class="sublabel" id="formLabel">form id: fkp1R74n</div>
+</div>
+
+<!-- Progress bar -->
+<div class="progress-wrap">
+  <div class="progress-bar" id="progressBar"></div>
+</div>
+
+<!-- Status bar -->
+<div class="status-bar">
+  <span><span class="dot" id="dot"></span><span id="statusText">awaiting token</span></span>
+  <span id="lastUpdate">—</span>
+</div>
+
+<script>
+  let token = '';
+  let formId = 'fkp1R74n';
+  let intervalSec = 20;
+  let timer = null;
+  let progressTimer = null;
+  let lastCount = null;
+
+  function toggleConfig() {
+    document.getElementById('configPanel').classList.toggle('open');
+  }
+
+  function saveAndStart() {
+    token = document.getElementById('apiToken').value.trim();
+    formId = document.getElementById('formId').value.trim();
+    intervalSec = parseInt(document.getElementById('interval').value) || 20;
+    document.getElementById('formLabel').textContent = 'form id: ' + formId;
+
+    if (!token) {
+      showError('Please enter your Typeform API token.');
+      return;
+    }
+    hideError();
+    document.getElementById('configPanel').classList.remove('open');
+    clearInterval(timer);
+    fetchCount();
+    timer = setInterval(fetchCount, intervalSec * 1000);
+    startProgress();
+  }
+
+  function showError(msg) {
+    const el = document.getElementById('errorMsg');
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+
+  function hideError() {
+    document.getElementById('errorMsg').style.display = 'none';
+  }
+
+  function setStatus(state, text) {
+    const dot = document.getElementById('dot');
+    dot.className = 'dot ' + state;
+    document.getElementById('statusText').textContent = text;
+  }
+
+  async function fetchCount() {
+    if (!token || !formId) return;
+
+    setStatus('', 'fetching…');
+    try {
+      // Fetch up to 1000 completed responses (Typeform max per page)
+      // completed=true filters out partial responses
+      const url = `https://api.typeform.com/forms/${formId}/responses?page_size=1000&completed=true`;
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.description || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+
+      // total_items is the authoritative count of completed submissions
+      const count = data.total_items ?? data.items?.length ?? 0;
+
+      updateCounter(count);
+      setStatus('live', 'live · refreshing every ' + intervalSec + 's');
+
+      const now = new Date();
+      document.getElementById('lastUpdate').textContent =
+        'last updated ' + now.toLocaleTimeString();
+
+      hideError();
+    } catch (e) {
+      setStatus('error', 'error — check token & form id');
+      document.getElementById('lastUpdate').textContent = e.message;
+      console.error(e);
+    }
+  }
+
+  function updateCounter(count) {
+    const el = document.getElementById('counter');
+    if (lastCount !== count) {
+      el.classList.remove('bump');
+      void el.offsetWidth; // reflow
+      el.classList.add('bump');
+      setTimeout(() => el.classList.remove('bump'), 400);
+    }
+    el.textContent = count.toLocaleString();
+    el.setAttribute('data-val', count.toLocaleString());
+    lastCount = count;
+  }
+
+  function startProgress() {
+    clearInterval(progressTimer);
+    const bar = document.getElementById('progressBar');
+    let elapsed = 0;
+    const step = 100;
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+
+    progressTimer = setInterval(() => {
+      elapsed += step;
+      const pct = Math.min((elapsed / (intervalSec * 1000)) * 100, 100);
+      bar.style.transition = `width ${step}ms linear`;
+      bar.style.width = pct + '%';
+      if (pct >= 100) {
+        setTimeout(() => {
+          bar.style.transition = 'none';
+          bar.style.width = '0%';
+          elapsed = 0;
+        }, 200);
+      }
+    }, step);
+  }
+
+  // Auto-open config if no token
+  window.addEventListener('load', () => {
+    document.getElementById('configPanel').classList.add('open');
+  });
+</script>
+
+</body>
+</html>
